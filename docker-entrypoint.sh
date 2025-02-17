@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Wait for MySQL to be ready
 echo "Waiting for MySQL to be ready..."
@@ -18,8 +19,11 @@ fi
 
 echo "MySQL is ready!"
 
-# Clear config cache
+# Clear all caches
+php artisan cache:clear
 php artisan config:clear
+php artisan route:clear
+php artisan view:clear
 
 # Generate app key if not set
 php artisan key:generate --force
@@ -29,4 +33,4 @@ php artisan migrate --force
 php artisan db:seed --force
 
 # Start PHP-FPM
-php-fpm
+exec php-fpm

@@ -34,20 +34,28 @@ RUN docker-php-ext-install gd
 # Install composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy application files
+# Copy composer files first
+COPY composer.json composer.lock ./
+
+# Install PHP dependencies
+RUN composer install --no-scripts --no-autoloader --no-dev
+
+# Copy the rest of the application files
 COPY . .
 
 # Set up environment file
 COPY .env.docker .env
-RUN php artisan key:generate
-
-# Install application dependencies
-RUN composer install --no-dev --optimize-autoloader
-RUN npm install
-RUN npm run build
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Generate optimized autoload files
+RUN composer dump-autoload --optimize
+
+# Install and build frontend assets
+RUN npm install
+RUN npm run build
 
 # Make entrypoint script executable
 COPY docker-entrypoint.sh /usr/local/bin/
