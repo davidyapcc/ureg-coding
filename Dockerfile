@@ -3,7 +3,7 @@ FROM php:8.2-fpm
 # Set working directory
 WORKDIR /var/www/html
 
-# Install dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpng-dev \
@@ -18,10 +18,12 @@ RUN apt-get update && apt-get install -y \
     curl \
     libzip-dev \
     libonig-dev \
-    nodejs \
-    npm \
-    netcat-traditional \
     default-mysql-client
+
+# Install Node.js and npm
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g npm
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -34,28 +36,52 @@ RUN docker-php-ext-install gd
 # Install composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy composer files first
-COPY composer.json composer.lock ./
+# Create directory and set permissions
+RUN mkdir -p /var/www/html \
+    && mkdir -p /var/www/.npm \
+    && mkdir -p /var/www/.composer \
+    && chown -R www-data:www-data /var/www/html \
+    && chown -R www-data:www-data /var/www/.npm \
+    && chown -R www-data:www-data /var/www/.composer \
+    && git config --global --add safe.directory /var/www/html
 
-# Install PHP dependencies
-RUN composer install --no-scripts --no-autoloader --no-dev
+# Switch to www-data user
+USER www-data
 
-# Copy the rest of the application files
-COPY . .
+# Set environment variables
+ENV npm_config_cache=/var/www/.npm
+ENV COMPOSER_HOME=/var/www/.composer
 
-# Set up environment file
-COPY .env.docker .env
+# Copy composer files
+COPY --chown=www-data:www-data composer.* ./
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Copy the rest of the application code first
+COPY --chown=www-data:www-data . .
 
-# Generate optimized autoload files
-RUN composer dump-autoload --optimize
+# Set proper permissions before running any commands
+RUN chmod -R 775 /var/www/html && \
+    chmod +x /var/www/html/artisan
 
-# Install and build frontend assets
-RUN npm install
+# Now run composer install
+RUN composer install \
+    --no-interaction \
+    --prefer-dist
+
+# Copy package files and install npm dependencies
+COPY --chown=www-data:www-data package*.json ./
+RUN npm ci && \
+    npm install -D vite@latest @vitejs/plugin-vue@latest
+
+# Generate application key and optimize
+RUN php artisan key:generate --force && \
+    php artisan optimize && \
+    php artisan package:discover --ansi
+
+# Build frontend assets
 RUN npm run build
+
+# Switch back to root for entrypoint setup
+USER root
 
 # Make entrypoint script executable
 COPY docker-entrypoint.sh /usr/local/bin/

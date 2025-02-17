@@ -108,7 +108,7 @@ npm run build
 php artisan serve
 ```
 
-The application will be available at `http://localhost:8000`
+The application will be available at `http://localhost:8080`
 
 ## Development
 

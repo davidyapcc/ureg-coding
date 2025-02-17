@@ -1,36 +1,65 @@
 #!/bin/sh
 set -e
 
-# Wait for MySQL to be ready
-echo "Waiting for MySQL to be ready..."
-maxTries=60
-while [ "$maxTries" -gt 0 ]; do
-    if mysql -h db -u ureg -pureg_password -e "SELECT 1" >/dev/null 2>&1; then
-        break
-    fi
-    maxTries=$(($maxTries - 1))
-    sleep 1
-done
-
-if [ "$maxTries" -le 0 ]; then
+# Function to wait for MySQL
+wait_for_mysql() {
+    echo "Waiting for MySQL to be ready..."
+    maxTries=60
+    while [ "$maxTries" -gt 0 ]; do
+        if mysql -h db -u ureg -pureg_password -e "SELECT 1" >/dev/null 2>&1; then
+            echo "MySQL is ready!"
+            return 0
+        fi
+        maxTries=$(($maxTries - 1))
+        echo "Waiting... $maxTries attempts left"
+        sleep 1
+    done
     echo >&2 "Error: Could not connect to MySQL after 60 seconds"
-    exit 1
-fi
+    return 1
+}
 
-echo "MySQL is ready!"
+# Function to run Laravel setup
+setup_laravel() {
+    echo "Setting up Laravel application..."
 
-# Clear all caches
-php artisan cache:clear
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
+    # Clear all caches
+    php artisan config:clear
+    php artisan cache:clear
+    php artisan view:clear
+    php artisan route:clear
 
-# Generate app key if not set
-php artisan key:generate --force
+    # Generate app key if not set
+    if [ -z "$(php artisan key:status --show)" ]; then
+        echo "Generating application key..."
+        php artisan key:generate --force
+    fi
 
-# Run migrations and seeders
-php artisan migrate --force
-php artisan db:seed --force
+    # Run migrations and seeders
+    echo "Running database migrations..."
+    if php artisan migrate --force; then
+        echo "Running database seeders..."
+        php artisan db:seed --force
+    else
+        echo >&2 "Error: Database migrations failed"
+        return 1
+    fi
 
-# Start PHP-FPM
-exec php-fpm
+    return 0
+}
+
+main() {
+    # Wait for MySQL to be ready
+    if ! wait_for_mysql; then
+        return 1
+    fi
+
+    # Setup Laravel
+    if ! setup_laravel; then
+        return 1
+    fi
+
+    echo "Starting PHP-FPM..."
+    exec php-fpm
+}
+
+main "$@"
