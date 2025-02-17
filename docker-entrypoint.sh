@@ -22,6 +22,12 @@ wait_for_mysql() {
 setup_laravel() {
     echo "Setting up Laravel application..."
 
+    # Ensure .env exists
+    if [ ! -f .env ]; then
+        echo "Creating .env file..."
+        cp .env.example .env
+    fi
+
     # Clear all caches
     php artisan config:clear
     php artisan cache:clear
@@ -29,7 +35,7 @@ setup_laravel() {
     php artisan route:clear
 
     # Generate app key if not already set
-    if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:$(php artisan key:generate --show)" ]; then
+    if [ -z "$APP_KEY" ]; then
         echo "Generating application key..."
         php artisan key:generate --force
     fi

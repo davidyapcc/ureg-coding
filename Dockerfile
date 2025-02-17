@@ -72,8 +72,9 @@ COPY --chown=www-data:www-data package*.json ./
 RUN npm ci && \
     npm install -D vite@latest @vitejs/plugin-vue@latest
 
-# Copy the .env file
-COPY --chown=www-data:www-data .env.docker .env
+# Ensure .env exists by copying from .env.docker
+RUN cp .env.docker .env && \
+    chmod 644 .env
 
 # Generate application key and optimize
 RUN php artisan key:generate --force && \
