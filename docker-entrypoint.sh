@@ -28,8 +28,8 @@ setup_laravel() {
     php artisan view:clear
     php artisan route:clear
 
-    # Generate app key if not set
-    if [ -z "$(php artisan key:status --show)" ]; then
+    # Generate app key if not already set
+    if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:$(php artisan key:generate --show)" ]; then
         echo "Generating application key..."
         php artisan key:generate --force
     fi
