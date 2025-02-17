@@ -55,34 +55,44 @@ ENV COMPOSER_HOME=/var/www/.composer
 # Copy composer files
 COPY --chown=www-data:www-data composer.* ./
 
-# Copy the rest of the application code first
-COPY --chown=www-data:www-data . .
-
-# Set proper permissions before running any commands
-RUN chmod -R 775 /var/www/html && \
-    chmod +x /var/www/html/artisan
-
-# Now run composer install
-RUN composer install \
-    --no-interaction \
-    --prefer-dist
-
 # Copy package files and install npm dependencies
 COPY --chown=www-data:www-data package*.json ./
-RUN npm ci && \
-    npm install -D vite@latest @vitejs/plugin-vue@latest
+COPY --chown=www-data:www-data vite.config.js ./
+
+# Install npm dependencies
+RUN npm install && \
+    npm install -D vite@latest @vitejs/plugin-vue@latest && \
+    npm install --save-dev @vitejs/plugin-vue && \
+    npm install --save-dev vite && \
+    npm install --save-dev laravel-vite-plugin
+
+# Copy the rest of the application code
+COPY --chown=www-data:www-data . .
+
+# Set proper permissions
+RUN chmod -R 775 /var/www/html && \
+    chmod +x /var/www/html/artisan
 
 # Ensure .env exists by copying from .env.docker
 RUN cp .env.docker .env && \
     chmod 644 .env
 
-# Generate application key and optimize
-RUN php artisan key:generate --force && \
-    php artisan optimize && \
-    php artisan package:discover --ansi
+# Install composer dependencies
+RUN composer install \
+    --no-interaction \
+    --prefer-dist
 
-# Build frontend assets
-RUN npm run build
+# Create build directory and set permissions
+RUN mkdir -p public/build && \
+    chmod -R 775 public/build
+
+# Build frontend assets with debugging
+RUN set -x && \
+    ls -la resources/js && \
+    ls -la resources/css && \
+    NODE_ENV=production npm run build -- --debug && \
+    ls -la public/build && \
+    cat public/build/manifest.json || echo "Manifest not created!"
 
 # Switch back to root for entrypoint setup
 USER root

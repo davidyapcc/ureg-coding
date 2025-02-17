@@ -25,7 +25,7 @@ setup_laravel() {
     # Ensure .env exists
     if [ ! -f .env ]; then
         echo "Creating .env file..."
-        cp .env.example .env
+        cp .env.docker .env
     fi
 
     # Clear all caches
@@ -39,6 +39,10 @@ setup_laravel() {
         echo "Generating application key..."
         php artisan key:generate --force
     fi
+
+    # Build frontend assets
+    echo "Building frontend assets..."
+    npm run build
 
     # Run migrations and seeders
     echo "Running database migrations..."

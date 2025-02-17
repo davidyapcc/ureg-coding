@@ -6,7 +6,7 @@
     },
     "scripts": {
         "dev": "vite",
-        "build": "vite build"
+        "build": "vite build && mv public/build/.vite/manifest.json public/build/manifest.json"
     },
     "devDependencies": {
         "@vitejs/plugin-vue": "^5.2.1",
